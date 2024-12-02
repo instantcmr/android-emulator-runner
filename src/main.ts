@@ -175,6 +175,14 @@ async function run() {
       console.log(`${script}`);
     });
 
+    // custom script to run after the test
+    const postTestScriptInput = core.getInput('post-test-script');
+    const postTestScripts = !postTestScriptInput ? undefined : parseScript(postTestScriptInput);
+    console.log(`Post Test Scripts:`);
+    postTestScripts?.forEach(async (script: string) => {
+      console.log(`${script}`);
+    });
+
     // custom pre emulator launch script
     const preEmulatorLaunchScriptInput = core.getInput('pre-emulator-launch-script');
     const preEmulatorLaunchScripts = !preEmulatorLaunchScriptInput ? undefined : parseScript(preEmulatorLaunchScriptInput);
@@ -241,6 +249,23 @@ async function run() {
       }
     } catch (error) {
       core.setFailed(error instanceof Error ? error.message : (error as string));
+    }
+
+     // execute post test scripts
+     if (postTestScripts !== undefined) {
+      console.log(`::group::Run post test scripts`);
+        // move to custom working directory if set
+      if (workingDirectory) {
+        process.chdir(workingDirectory);
+      }
+      for (const script of postTestScripts) {
+        // use array form to avoid various quote escaping problems
+        // caused by exec(`sh -c "${script}"`)
+        await exec.exec('sh', ['-c', script], {
+          env: { ...process.env, EMULATOR_PORT: `${port}`, ANDROID_SERIAL: `emulator-${port}` },
+        });
+      }
+      console.log(`::endgroup::`);
     }
 
     // finally kill the emulator
